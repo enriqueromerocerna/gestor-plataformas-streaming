@@ -1340,7 +1340,7 @@ function assignProf(clientId,profId,acctId){
 // ─────────────────────────────────────────────
 function waMsg(cl,a,pr,p){
   const platName=p?p.name:'Streaming';
-  return `Hola ${cl.name} 🎬\nAquí tus datos de ${platName}:\n\n📧 Correo: ${a.email}\n🔑 Clave: ********\n👤 Perfil: ${pr.name}\n🔐 PIN: ${pr.pin}\n\n✅ ¡Disfruta tu servicio!\n— Portal Streaming`;
+  return `✨ ¡Gracias por confiar en Portal Streaming! ✨\nHola, ${cl.name} 👋 Aquí tienes las credenciales de tu servicio de ${platName}:\n\n📧 Correo: ${a.email}\n🔑 Contraseña: ********\n👤 Perfil asignado: ${pr.name}\n🔐 PIN de acceso: ${pr.pin}\n\n📌 Recomendaciones para un servicio óptimo:\n\nPor favor, ingresa únicamente al perfil asignado.\nEvita modificar la contraseña, el PIN o los nombres de otros perfiles.\n\n🎬 ¡Que disfrutes de tu programación favorita! 🍿`;
 }
 function buildRenewMsg(cl,sub){
   const p=plat(sub.platform);
