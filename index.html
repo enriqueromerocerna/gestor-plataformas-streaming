@@ -1229,7 +1229,11 @@ function renderPlatPage(pid){
         </div>
       </div>
       <table>
-        <thead><tr><th>#</th><th>Perfil</th><th>PIN</th><th>Cliente asignado</th><th>Celular</th><th>Estado</th><th>Acción</th></tr></thead>
+        <thead><tr><th>#</th>
+          ${p.id==='youtube'?'<th>Correo del cliente</th><th>Contraseña</th>':'<th>Perfil</th><th>PIN</th>'}
+          <th>Cliente asignado</th><th>Celular</th><th>Estado</th>
+          ${p.id==='youtube'?'<th>Usos</th>':''}
+          <th>Acción</th></tr></thead>
         <tbody>${a.profiles.map((pr,i)=>profRow(pr,a,p,i+1)).join('')}</tbody>
       </table>
     </div>`;
@@ -1240,12 +1244,30 @@ function renderPlatPage(pid){
 function profRow(pr,a,p,n){
   const sub=subByProfile(pr.id);
   const cl=sub?clientById(sub.clientId):null;
+  const isYT=p.id==='youtube';
   const num=`<td><span style="font-family:'DM Mono',monospace;font-size:11px;color:var(--text3)">#${n}</span></td>`;
+
   if(sub&&cl){
+    const ytCols=isYT?`
+      <td style="font-size:11px">${sub.ytEmail||'—'}</td>
+      <td><span class="pin">${sub.ytPass||'—'}</span></td>`
+      :`<td><strong>${pr.name}</strong></td><td><span class="pin">${pr.pin}</span></td>`;
+    const estadoCell=isYT
+      ? sub.ytDesactivado
+        ? `<td><button onclick="toggleYTSlot('${sub.id}')" style="background:rgba(120,120,120,.15);border:1px solid #555;color:#aaa;border-radius:6px;padding:3px 10px;font-size:11px;cursor:pointer;font-weight:700">⛔ DESACTIVADO</button></td>`
+        : `<td><button onclick="toggleYTSlot('${sub.id}')" style="background:rgba(255,0,0,.12);border:1px solid rgba(255,80,80,.3);color:#ff6b6b;border-radius:6px;padding:3px 10px;font-size:11px;cursor:pointer;font-weight:700">🔴 OCUPADO</button></td>`
+      : `<td><span class="badge b-ocupado">🔴 OCUPADO</span></td>`;
+    const usoCell=isYT?`<td style="text-align:center">
+      <div style="display:flex;flex-direction:column;gap:4px;align-items:flex-start">
+        <label style="display:flex;align-items:center;gap:5px;font-size:11px;cursor:pointer;color:var(--text2);white-space:nowrap">
+          <input type="checkbox" ${sub.ytUso1?'checked':''} onchange="setYTUso('${sub.id}',1,this.checked)" style="width:15px;height:15px;accent-color:var(--accent);cursor:pointer;flex-shrink:0"> 1° vez
+        </label>
+        <label style="display:flex;align-items:center;gap:5px;font-size:11px;cursor:pointer;color:var(--text2);white-space:nowrap">
+          <input type="checkbox" ${sub.ytUso2?'checked':''} onchange="setYTUso('${sub.id}',2,this.checked)" style="width:15px;height:15px;accent-color:var(--accent);cursor:pointer;flex-shrink:0"> 2° vez
+        </label>
+      </div></td>`:'';
     return`<tr>
-      ${num}
-      <td><strong>${pr.name}</strong></td>
-      <td><span class="pin">${pr.pin}</span></td>
+      ${num}${ytCols}
       <td>
         <div class="ac-wrap"><input class="ac-input" value="${cl.name}"
           oninput="acSearch(this,'${pr.id}','${a.id}')"
@@ -1255,14 +1277,15 @@ function profRow(pr,a,p,n){
         <div class="ac-drop"></div></div>
       </td>
       <td style="font-family:'DM Mono',monospace;font-size:11px;color:var(--text2)">${cl.phone}</td>
-      <td><span class="badge b-ocupado">🔴 OCUPADO</span></td>
+      ${estadoCell}${usoCell}
       <td><button class="btn btn-wa btn-sm" onclick="showWA('${sub.id}')">📲 Enviar</button></td>
     </tr>`;
   }else{
+    const ytColsLibre=isYT
+      ?`<td style="color:var(--text3);font-size:11px">— libre —</td><td>—</td>`
+      :`<td style="color:var(--text3)">${pr.name}</td><td><span class="pin" style="color:var(--text3)">${pr.pin}</span></td>`;
     return`<tr>
-      ${num}
-      <td style="color:var(--text3)">${pr.name}</td>
-      <td><span class="pin" style="color:var(--text3)">${pr.pin}</span></td>
+      ${num}${ytColsLibre}
       <td>
         <div class="ac-wrap"><input class="ac-input" value=""
           oninput="acSearch(this,'${pr.id}','${a.id}')"
@@ -1273,6 +1296,7 @@ function profRow(pr,a,p,n){
       </td>
       <td></td>
       <td><span class="badge b-libre">✅ LIBRE</span></td>
+      ${isYT?'<td>—</td>':''}
       <td><button class="btn-libre" onclick="waLibre('${a.id}','${pr.id}','${p.id}')">📲 LIBRE — enviar</button></td>
     </tr>`;
   }
@@ -1341,7 +1365,17 @@ function showWA(subId){
   const pr=a.profiles.find(p=>p.id===sub.profileId);
   const p=plat(a.platform);
   const isYT=sub.platform==='youtube';
-  const msg=isYT?buildRenewMsg(cl,sub):waMsg(cl,a,pr,p);
+
+  let msg;
+  if(isYT){
+    const meses=sub.months||1;
+    const inicio=sub.start?fmt(sub.start):'—';
+    const fin=sub.start?fmt(expDate(sub)):'—';
+    msg=`Hola, ${cl.name} 👋🍿\n\nTe enviamos los datos de acceso para tu servicio de *YouTube Premium*:\n\n📧 Correo: ${sub.ytEmail||'—'}\n🔑 Contraseña: ${sub.ytPass||'—'}\n\n📅 Fecha de inicio: ${inicio}\n📆 Fecha de vencimiento: ${fin}\n🗓️ Meses contratados: ${meses} ${meses===1?'mes':'meses'}\n\nRecuerda iniciar sesión desde tu dispositivo y disfrutar tu servicio. Ante cualquier duda estamos para ayudarte 😊\n— Portal Streaming`;
+  }else{
+    msg=waMsg(cl,a,pr,p);
+  }
+
   _waData={phone:cl.phone,msg};
   document.getElementById('wa-info').innerHTML=`
     <div class="wa-info-row"><span class="wa-info-label">Cliente</span><span class="wa-info-val">${cl.name}</span></div>
@@ -1500,13 +1534,13 @@ function renderProveedores(){
                 }</td>
                 ${p.id==='youtube' ? `<td style="text-align:center">
                   ${cl2 ? `
-                    <div style="display:flex;flex-direction:column;gap:4px;align-items:center">
-                      <label style="display:flex;align-items:center;gap:5px;font-size:11px;cursor:pointer;color:var(--text2)">
-                        <input type="checkbox" ${sub2.ytUso1?'checked':''} onchange="setYTUso('${sub2.id}',1,this.checked)" style="width:15px;height:15px;accent-color:var(--accent);cursor:pointer">
+                    <div style="display:flex;flex-direction:column;gap:4px;align-items:flex-start">
+                      <label style="display:flex;align-items:center;gap:5px;font-size:11px;cursor:pointer;color:var(--text2);white-space:nowrap">
+                        <input type="checkbox" ${sub2.ytUso1?'checked':''} onchange="setYTUso('${sub2.id}',1,this.checked)" style="width:15px;height:15px;accent-color:var(--accent);cursor:pointer;flex-shrink:0">
                         1° vez
                       </label>
-                      <label style="display:flex;align-items:center;gap:5px;font-size:11px;cursor:pointer;color:var(--text2)">
-                        <input type="checkbox" ${sub2.ytUso2?'checked':''} onchange="setYTUso('${sub2.id}',2,this.checked)" style="width:15px;height:15px;accent-color:var(--accent);cursor:pointer">
+                      <label style="display:flex;align-items:center;gap:5px;font-size:11px;cursor:pointer;color:var(--text2);white-space:nowrap">
+                        <input type="checkbox" ${sub2.ytUso2?'checked':''} onchange="setYTUso('${sub2.id}',2,this.checked)" style="width:15px;height:15px;accent-color:var(--accent);cursor:pointer;flex-shrink:0">
                         2° vez
                       </label>
                     </div>` : '<span style="color:var(--text3);font-size:11px">—</span>'}
