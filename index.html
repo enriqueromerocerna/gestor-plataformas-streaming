@@ -836,6 +836,29 @@ tr:hover td{background:rgba(255,90,31,.035)}
 </div>
 </div>
 
+<!-- MODAL MIGRAR CORREO YOUTUBE -->
+<div class="modal-overlay" id="modal-migrate">
+<div class="modal">
+  <div class="modal-title">🔁 Migrar a nuevo correo</div>
+  <div style="font-size:12px;color:var(--text2);margin-bottom:14px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 13px" id="mig-info"></div>
+  <div class="form-group"><label class="form-label">Nuevo correo del cliente (Gmail)</label>
+    <input type="text" class="form-input" id="mig-email" placeholder="nuevo@gmail.com"></div>
+  <div class="form-group"><label class="form-label">Contraseña del nuevo correo</label>
+    <input type="text" class="form-input" id="mig-pass" placeholder="Contraseña"></div>
+  <div class="form-group"><label class="form-label">Perfil destino (slot libre de YouTube)</label>
+    <select class="form-input form-select" id="mig-target"></select></div>
+  <div style="background:rgba(124,111,255,.08);border:1px solid rgba(124,111,255,.25);border-radius:8px;padding:10px 13px;font-size:12px;color:var(--text2);margin-bottom:6px">
+    ✅ Se conservará la fecha de inicio, vencimiento y el pago ya registrados.<br>
+    ⛔ El correo anterior quedará bloqueado (ya no se podrá reutilizar) pero seguirá visible en Plataformas → YouTube para tu orden interno.<br>
+    👤 En la ficha del cliente ya solo se mostrará el nuevo correo.
+  </div>
+  <div class="modal-actions">
+    <button class="btn" onclick="closeModal('modal-migrate')">Cancelar</button>
+    <button class="btn btn-primary" onclick="confirmMigrateYT()">Migrar cliente</button>
+  </div>
+</div>
+</div>
+
 <!-- MODAL CUENTA PROVEEDORES -->
 <div class="modal-overlay" id="modal-account">
 <div class="modal">
@@ -1025,7 +1048,7 @@ const acct=id=>accounts.find(a=>a.id===id);
 const prof=(accts,pid)=>{for(const a of accts){const p=a.profiles.find(p=>p.id===pid);if(p)return{p,a};}return null};
 const subByProfile=pid=>subscriptions.find(s=>s.profileId===pid);
 const clientById=id=>clients.find(c=>c.id===id);
-const subsByClient=cid=>subscriptions.filter(s=>s.clientId===cid);
+const subsByClient=cid=>subscriptions.filter(s=>s.clientId===cid&&!s.ytArchived);
 
 function parseDate(str){
   // Parsea "YYYY-MM-DD" como fecha local (evita desfase UTC)
@@ -1367,10 +1390,15 @@ function profRow(pr,a,p,n){
           placeholder="Buscar cliente...">
         <div class="ac-drop"></div></div>
       </td>
-      <td style="font-family:'DM Mono',monospace;font-size:11px;color:var(--text2)">${cl.phone}</td>
+      <td style="font-family:'DM Mono',monospace;font-size:11px;color:var(--text2)">${cl.phone}${sub.ytArchived?'<div style="color:var(--text3);font-size:10px;margin-top:2px">🔒 correo migrado</div>':''}</td>
       <td style="font-size:11px;${venceColor}">${venceStr}</td>
       ${estadoCell}${usoCell}
-      <td><button class="btn btn-wa btn-sm" onclick="showWA('${sub.id}')">📲 Enviar</button></td>
+      <td>
+        <div style="display:flex;gap:5px;flex-wrap:wrap">
+          <button class="btn btn-wa btn-sm" onclick="showWA('${sub.id}')">📲 Enviar</button>
+          ${isYT&&!sub.ytArchived?`<button class="btn btn-sm" style="background:rgba(124,111,255,.15);border:1px solid rgba(124,111,255,.35);color:#a79bff" onclick="openMigrateYT('${sub.id}')" title="Mover a un correo nuevo, conservando fechas y pago">🔁 Migrar correo</button>`:''}
+        </div>
+      </td>
     </tr>`;
   }else{
     const ytColsLibre=isYT
@@ -1463,6 +1491,54 @@ function liberarPerfilDesdeSub(subId){
   toast('✓ Perfil liberado');
   renderReporte();renderSidebar();renderClientes();
   if(_curPlat)renderPlatPage(_curPlat);
+}
+
+// ─────────────────────────────────────────────
+// MIGRAR CLIENTE DE YOUTUBE A UN NUEVO CORREO
+// (cuando el correo del cliente ya agotó sus 2 reactivaciones y necesita uno nuevo)
+// ─────────────────────────────────────────────
+let _migSubId=null;
+function openMigrateYT(subId){
+  const s=subscriptions.find(x=>x.id===subId);
+  if(!s)return;
+  _migSubId=subId;
+  const cl=clientById(s.clientId);
+  document.getElementById('mig-info').innerHTML=`<strong>Cliente:</strong> ${cl?cl.name:'—'}<br><strong>Correo actual:</strong> ${s.ytEmail||'—'}`;
+  document.getElementById('mig-email').value='';
+  document.getElementById('mig-pass').value='';
+  const sel=document.getElementById('mig-target');
+  const freeSlots=[];
+  accounts.filter(a=>a.platform==='youtube').forEach(a=>{
+    a.profiles.forEach(pr=>{ if(!subByProfile(pr.id)) freeSlots.push({a,pr}); });
+  });
+  sel.innerHTML=freeSlots.length
+    ? freeSlots.map(({a,pr})=>`<option value="${pr.id}|${a.id}">${a.email} (Cuenta #${a.num})</option>`).join('')
+    : '<option value="">— No hay perfiles libres de YouTube, crea uno en Proveedores —</option>';
+  document.getElementById('modal-migrate').classList.add('open');
+}
+function confirmMigrateYT(){
+  const old=subscriptions.find(x=>x.id===_migSubId);
+  if(!old)return;
+  const target=document.getElementById('mig-target').value;
+  if(!target){toast('⚠ No hay un perfil libre de YouTube disponible','error');return;}
+  const email=document.getElementById('mig-email').value.trim();
+  const pass=document.getElementById('mig-pass').value.trim();
+  if(!email){toast('⚠ Escribe el nuevo correo del cliente','error');return;}
+  const [profId,acctId]=target.split('|');
+  // La nueva suscripción hereda fecha de inicio, vencimiento y pago del registro original
+  const newSub={...old,id:uid(),profileId:profId,accountId:acctId,
+    ytEmail:email,ytPass:pass,ytUso1:false,ytUso2:false,ytDesactivado:false,ytArchived:false};
+  subscriptions.push(newSub);
+  // El correo anterior queda bloqueado (no reutilizable) y oculto en la ficha del cliente,
+  // pero sigue visible en Plataformas → YouTube para mantener el orden interno.
+  old.ytDesactivado=true;
+  old.ytArchived=true;
+  saveAll();
+  closeModal('modal-migrate');
+  toast('✓ Cliente migrado al nuevo correo');
+  renderSidebar();
+  if(_curPlat)renderPlatPage(_curPlat);
+  renderClientes();
 }
 
 // ─────────────────────────────────────────────
