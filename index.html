@@ -149,7 +149,7 @@ main{padding:20px 24px;overflow-y:auto}
 /* CARDS */
 .card{
   background:linear-gradient(165deg,var(--surface2),var(--surface));
-  border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;margin-bottom:16px;
+  border:1px solid var(--border);border-radius:var(--radius);overflow-x:auto;overflow-y:hidden;margin-bottom:16px;
   box-shadow:var(--shadow-card);position:relative;
 }
 .card-head{display:flex;align-items:center;gap:10px;padding:13px 18px;border-bottom:1px solid var(--border);background:rgba(255,90,31,.025)}
@@ -2843,9 +2843,10 @@ function renderReporteCuentas(){
       <td style="font-size:11px;font-weight:600;color:${st==='vencido'?'var(--red)':'var(--yellow)'}">${fmt(a.expDate)}</td>
       <td>${badgeMap[st]}</td>
       <td>
-        <div style="display:flex;gap:5px">
+        <div style="display:flex;gap:5px;flex-wrap:wrap">
           ${a.supplierPhone?`<button class="btn btn-wa btn-sm" onclick="window.open('https://api.whatsapp.com/send?phone=${a.supplierPhone}&text=${waMsg}','_blank')">📲 Proveedor</button>`:''}
           <button class="btn btn-sm" onclick="openEditAccount('${a.id}')">✏ Editar</button>
+          <button class="btn btn-sm" style="background:rgba(100,200,100,.15);border:1px solid rgba(100,200,100,.3);color:#7dda8a" title="Suma 30 días desde hoy (o desde el vencimiento actual si aún no vence)" onclick="renovarCuenta('${a.id}')">🔄 Renovar</button>
         </div>
       </td>
     </tr>`;
@@ -2853,6 +2854,23 @@ function renderReporteCuentas(){
   html+=`</tbody></table></div>`;
   document.getElementById('reporte-cuentas-content').innerHTML=html;
   return urgentAccts.length;
+}
+
+// Renueva una cuenta de proveedor 30 días: si ya venció, cuenta desde hoy; si aún le quedan
+// días, los conserva y suma 30 más desde su vencimiento actual (igual que renovarSub para clientes).
+function renovarCuenta(accountId){
+  const a=accounts.find(x=>x.id===accountId);
+  if(!a)return;
+  const hoy=new Date();hoy.setHours(0,0,0,0);
+  const vence=a.expDate?parseDate(a.expDate):null;
+  const base=(!vence||vence<=hoy)?hoy:vence;
+  const nueva=new Date(base);
+  nueva.setDate(nueva.getDate()+30);
+  a.acqDate=base.toISOString().split('T')[0];
+  a.expDate=nueva.toISOString().split('T')[0];
+  saveAll();
+  renderReporte();renderProveedores();renderSidebar();
+  toast(`✓ Cuenta renovada hasta ${fmt(nueva)}`);
 }
 
 // ─────────────────────────────────────────────
