@@ -157,7 +157,7 @@ main{padding:20px 24px;overflow-y:auto}
 .card-head-right{margin-left:auto;display:flex;align-items:center;gap:8px}
 
 /* TABLE */
-table{width:100%;border-collapse:collapse}
+table{width:max-content;min-width:100%;border-collapse:collapse}
 th{font-family:var(--font-hud);font-size:11.5px;font-weight:700;color:var(--cyan);text-transform:uppercase;letter-spacing:.6px;padding:10px 14px;text-align:left;border-bottom:1px solid var(--border2);white-space:nowrap;background:rgba(255,90,31,.025);opacity:.95}
 td{padding:10px 14px;border-bottom:1px solid var(--border);font-size:13px;color:var(--text);vertical-align:middle}
 tr:last-child td{border-bottom:none}
@@ -1406,31 +1406,31 @@ function profRow(pr,a,p,n){
         : `<td><button onclick="toggleYTSlot('${sub.id}')" style="background:rgba(255,0,0,.12);border:1px solid rgba(255,80,80,.3);color:#ff6b6b;border-radius:6px;padding:3px 10px;font-size:11px;cursor:pointer;font-weight:700">🔴 OCUPADO</button></td>`
       : `<td><button onclick="unassignProf('${pr.id}')" style="background:rgba(255,0,0,.12);border:1px solid rgba(255,80,80,.3);color:#ff6b6b;border-radius:6px;padding:3px 10px;font-size:11px;cursor:pointer;font-weight:700">🔴 OCUPADO</button></td>`;
     const usoCell=isYT?`<td style="text-align:center">
-      <div style="display:flex;flex-direction:column;gap:4px;align-items:flex-start">
-        <label style="display:flex;align-items:center;gap:5px;font-size:11px;cursor:pointer;color:var(--text2);white-space:nowrap">
-          <input type="checkbox" ${sub.ytUso1?'checked':''} onchange="setYTUso('${sub.id}',1,this.checked)" style="width:15px;height:15px;accent-color:var(--accent);cursor:pointer;flex-shrink:0"> 1° vez
+      <div style="display:flex;gap:8px;align-items:center;justify-content:center">
+        <label style="display:flex;align-items:center;gap:3px;font-size:11px;cursor:pointer;color:var(--text2);white-space:nowrap" title="1° vez">
+          <input type="checkbox" ${sub.ytUso1?'checked':''} onchange="setYTUso('${sub.id}',1,this.checked)" style="width:15px;height:15px;accent-color:var(--accent);cursor:pointer;flex-shrink:0"> 1°
         </label>
-        <label style="display:flex;align-items:center;gap:5px;font-size:11px;cursor:pointer;color:var(--text2);white-space:nowrap">
-          <input type="checkbox" ${sub.ytUso2?'checked':''} onchange="setYTUso('${sub.id}',2,this.checked)" style="width:15px;height:15px;accent-color:var(--accent);cursor:pointer;flex-shrink:0"> 2° vez
+        <label style="display:flex;align-items:center;gap:3px;font-size:11px;cursor:pointer;color:var(--text2);white-space:nowrap" title="2° vez">
+          <input type="checkbox" ${sub.ytUso2?'checked':''} onchange="setYTUso('${sub.id}',2,this.checked)" style="width:15px;height:15px;accent-color:var(--accent);cursor:pointer;flex-shrink:0"> 2°
         </label>
       </div></td>`:'';
     return`<tr>
       ${num}${ytCols}
       <td>
-        <div class="ac-wrap"><input class="ac-input" value="${cl.name}"
+        <div class="ac-wrap"><input class="ac-input" style="min-width:130px" value="${cl.name}"
           oninput="acSearch(this,'${pr.id}','${a.id}')"
           onfocus="acSearch(this,'${pr.id}','${a.id}')"
           onblur="setTimeout(()=>{ if(this.value.trim()==='') unassignProf('${pr.id}'); closeAc(this); },180)"
           placeholder="Buscar cliente...">
         <div class="ac-drop"></div></div>
       </td>
-      <td style="font-family:'DM Mono',monospace;font-size:11px;color:var(--text2)">${cl.phone}${sub.ytArchived?'<div style="color:var(--text3);font-size:10px;margin-top:2px">🔒 correo migrado</div>':''}</td>
-      <td style="font-size:11px;${venceColor}">${venceStr}</td>
+      <td style="font-family:'DM Mono',monospace;font-size:11px;color:var(--text2);white-space:nowrap">${cl.phone}${sub.ytArchived?'<div style="color:var(--text3);font-size:10px;margin-top:2px">🔒 migrado</div>':''}</td>
+      <td style="font-size:11px;white-space:nowrap;${venceColor}">${venceStr}</td>
       ${estadoCell}${usoCell}
       <td>
-        <div style="display:flex;gap:5px;flex-wrap:wrap">
-          <button class="btn btn-wa btn-sm" onclick="showWA('${sub.id}')">📲 Enviar</button>
-          ${isYT&&!sub.ytArchived?`<button class="btn btn-sm" style="background:rgba(124,111,255,.15);border:1px solid rgba(124,111,255,.35);color:#a79bff" onclick="openMigrateYT('${sub.id}')" title="Mover a un correo nuevo, conservando fechas y pago">🔁 Migrar correo</button>`:''}
+        <div style="display:flex;gap:5px;flex-wrap:nowrap">
+          <button class="btn btn-wa btn-sm" onclick="showWA('${sub.id}')" title="Enviar datos por WhatsApp">📲</button>
+          ${isYT&&!sub.ytArchived?`<button class="btn btn-sm" style="background:rgba(124,111,255,.15);border:1px solid rgba(124,111,255,.35);color:#a79bff" onclick="openMigrateYT('${sub.id}')" title="Migrar a un correo nuevo, conservando fechas y pago">🔁</button>`:''}
         </div>
       </td>
     </tr>`;
