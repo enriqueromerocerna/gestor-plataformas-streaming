@@ -79,6 +79,20 @@ nav{
   border-color:rgba(255,90,31,.35);color:#ffd9cf;
   box-shadow:0 4px 16px -4px var(--cyan-glow);
 }
+.report-tabs{display:flex;gap:8px;margin-bottom:18px;flex-wrap:wrap}
+.report-tab{
+  display:inline-flex;align-items:center;gap:7px;padding:9px 16px;border-radius:9px;font-size:13px;font-weight:700;cursor:pointer;
+  border:1px solid var(--border);background:var(--surface2);color:var(--text2);transition:all .15s;font-family:var(--font-hud);letter-spacing:.3px;
+}
+.report-tab:hover{background:rgba(255,90,31,.08);color:var(--text);border-color:var(--border2)}
+.report-tab.active{
+  background:linear-gradient(145deg,#ff3850,#e8420f);border-color:rgba(255,90,31,.4);color:#fff;
+  box-shadow:0 4px 16px -4px var(--accent-glow);
+}
+.report-tab .report-tab-count{
+  background:rgba(0,0,0,.25);min-width:20px;height:20px;padding:0 6px;border-radius:5px;font-size:11px;
+  display:inline-flex;align-items:center;justify-content:center;font-family:var(--font-mono);
+}
 
 /* LAYOUT */
 .app{display:grid;grid-template-columns:240px 1fr;min-height:calc(100vh - 60px)}
@@ -514,11 +528,20 @@ tr:hover td{background:rgba(255,90,31,.035)}
 <div class="page" id="page-reporte">
   <div class="page-header">
     <div class="page-header-text">
-      <div class="page-title">📢 Reporte masivo</div>
-      <div class="page-subtitle">Clientes próximos a vencer — envía recordatorios en masa por WhatsApp</div>
+      <div class="page-title">📢 Reporte</div>
+      <div class="page-subtitle">Clientes y cuentas de proveedores próximos a vencer o ya vencidos</div>
     </div>
   </div>
+  <div class="report-tabs">
+    <button class="report-tab active" id="rtab-clientes" onclick="switchReporteTab('clientes')">
+      👥 Reporte de clientes <span class="report-tab-count" id="rtab-clientes-count">0</span>
+    </button>
+    <button class="report-tab" id="rtab-cuentas" onclick="switchReporteTab('cuentas')">
+      📡 Reporte de cuentas <span class="report-tab-count" id="rtab-cuentas-count">0</span>
+    </button>
+  </div>
   <div id="reporte-content"></div>
+  <div id="reporte-cuentas-content" style="display:none"></div>
 </div>
 
 <div class="page" id="page-soporte">
@@ -1073,6 +1096,15 @@ function status(s){
   const diff=Math.round((e-today)/(864e5));
   if(diff<0)return'vencido';if(diff<=1)return'1d';if(diff<=3)return'3d';if(diff<=7)return'7d';return'activo';
 }
+// Estado de vencimiento de una CUENTA de proveedor (según a.expDate, calculado como
+// fecha de adquisición + 30 días). Devuelve null si la cuenta no tiene fecha registrada.
+function accountStatus(a){
+  if(!a.expDate)return null;
+  const e=parseDate(a.expDate);
+  const today=new Date();today.setHours(0,0,0,0);
+  const diff=Math.round((e-today)/(864e5));
+  if(diff<0)return'vencido';if(diff<=3)return'3d';if(diff<=7)return'7d';return'activo';
+}
 function statusBadge(s){
   const st=status(s),m={'vencido':'b-vencido 🔴 VENCIDO','1d':'b-warning ⚠ 1 DÍA','3d':'b-warning ⚠ 3 DÍAS',
     '7d':'b-warning ⚠ 7 DÍAS','activo':'b-activo ✅ ACTIVO'};
@@ -1178,7 +1210,9 @@ function renderSidebar(){
   const el=document.getElementById('sidebar');
   const occTotal=accounts.flatMap(a=>a.profiles).filter(pr=>subByProfile(pr.id)).length;
   const freeTotal=accounts.flatMap(a=>a.profiles).length-occTotal;
-  const urgentTotal=subscriptions.filter(s=>{const st=status(s);return st==='vencido'||st==='1d'||st==='3d'||st==='7d';}).length;
+  const urgentClientesTotal=subscriptions.filter(s=>{const st=status(s);return st==='vencido'||st==='1d'||st==='3d'||st==='7d';}).length;
+  const urgentCuentasTotal=accounts.filter(a=>{const st=accountStatus(a);return st==='vencido'||st==='3d'||st==='7d';}).length;
+  const urgentTotal=urgentClientesTotal+urgentCuentasTotal;
 
   let h=`
   <div class="sidebar-item${_curPage==='dashboard'?' active':''}" onclick="showPage('dashboard',null)">
@@ -2681,7 +2715,28 @@ function closeModal(id){
 // ─────────────────────────────────────────────
 // REPORTE MASIVO
 // ─────────────────────────────────────────────
+let _reporteTab='clientes';
+
+// Dispatcher: calcula ambos sub-reportes (clientes y cuentas), actualiza los contadores
+// de las pestañas y muestra el contenido de la pestaña activa.
 function renderReporte(){
+  const clientesUrgentCount=renderReporteClientes();
+  const cuentasUrgentCount=renderReporteCuentas();
+  document.getElementById('rtab-clientes-count').textContent=clientesUrgentCount;
+  document.getElementById('rtab-cuentas-count').textContent=cuentasUrgentCount;
+  document.getElementById('reporte-content').style.display=_reporteTab==='clientes'?'block':'none';
+  document.getElementById('reporte-cuentas-content').style.display=_reporteTab==='cuentas'?'block':'none';
+  document.getElementById('rtab-clientes').classList.toggle('active',_reporteTab==='clientes');
+  document.getElementById('rtab-cuentas').classList.toggle('active',_reporteTab==='cuentas');
+}
+
+function switchReporteTab(tab){
+  _reporteTab=tab;
+  renderReporte();
+}
+
+// Reporte de CLIENTES: suscripciones próximas a vencer o vencidas. Devuelve el total urgente.
+function renderReporteClientes(){
   const urgent=subscriptions.filter(s=>{
     const st=status(s);return st==='vencido'||st==='1d'||st==='3d'||st==='7d';
   }).sort((a,b)=>{const order={vencido:0,'1d':1,'3d':2,'7d':3};return order[status(a)]-order[status(b)];});
@@ -2699,7 +2754,7 @@ function renderReporte(){
       <div style="font-size:16px;font-weight:600;color:var(--text)">¡Todo al día!</div>
       <div style="font-size:13px;margin-top:6px">No hay suscripciones próximas a vencer ni vencidas.</div>
     </div>`;
-    document.getElementById('reporte-content').innerHTML=html;return;
+    document.getElementById('reporte-content').innerHTML=html;return 0;
   }
 
   html+=`<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
@@ -2736,6 +2791,68 @@ function renderReporte(){
   });
   html+=`</tbody></table></div>`;
   document.getElementById('reporte-content').innerHTML=html;
+  return urgent.length;
+}
+
+// Reporte de CUENTAS: cuentas de proveedores próximas a vencer o vencidas (según fecha de
+// adquisición + 30 días). Devuelve el total urgente.
+function renderReporteCuentas(){
+  const urgentAccts=accounts.filter(a=>{
+    const st=accountStatus(a);return st==='vencido'||st==='3d'||st==='7d';
+  }).sort((a,b)=>{const order={vencido:0,'3d':1,'7d':2};return order[accountStatus(a)]-order[accountStatus(b)];});
+
+  const sinFecha=accounts.filter(a=>!a.expDate).length;
+
+  let html=`<div class="stats" style="grid-template-columns:repeat(3,1fr);margin-bottom:20px">
+    <div class="stat-card"><div class="stat-label">Total urgentes</div><div class="stat-value sv-red">${urgentAccts.length}</div></div>
+    <div class="stat-card"><div class="stat-label">Cuentas vencidas</div><div class="stat-value sv-red">${urgentAccts.filter(a=>accountStatus(a)==='vencido').length}</div></div>
+    <div class="stat-card"><div class="stat-label">Vencen ≤7 días</div><div class="stat-value sv-yellow">${urgentAccts.filter(a=>accountStatus(a)==='3d'||accountStatus(a)==='7d').length}</div></div>
+  </div>`;
+
+  if(!urgentAccts.length){
+    html+=`<div class="card" style="padding:40px;text-align:center;color:var(--text3)">
+      <div style="font-size:40px;margin-bottom:12px">🎉</div>
+      <div style="font-size:16px;font-weight:600;color:var(--text)">¡Todas las cuentas al día!</div>
+      <div style="font-size:13px;margin-top:6px">No hay cuentas de proveedores próximas a vencer ni vencidas.${sinFecha?` <br>ℹ️ ${sinFecha} cuenta${sinFecha!==1?'s':''} sin fecha de adquisición registrada — agrégala en Proveedores para poder monitorearlas.`:''}</div>
+    </div>`;
+    document.getElementById('reporte-cuentas-content').innerHTML=html;return 0;
+  }
+
+  html+=`<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+    <div style="font-size:13px;color:var(--text2)">${urgentAccts.length} cuenta${urgentAccts.length!==1?'s':''} de proveedor${urgentAccts.length!==1?'es':''} requiere${urgentAccts.length!==1?'n':''} atención${sinFecha?` · ℹ️ ${sinFecha} sin fecha de adquisición registrada`:''}</div>
+  </div>
+  <div class="card"><table>
+    <thead><tr><th>#</th><th>Plataforma</th><th>Cuenta</th><th>Proveedor</th><th>Adquirida</th><th>Vence</th><th>Estado</th><th>Acción</th></tr></thead>
+    <tbody>`;
+
+  urgentAccts.forEach((a,i)=>{
+    const p=plat(a.platform);
+    const st=accountStatus(a);
+    const rowBg=st==='vencido'?'background:rgba(240,86,86,.06)':'background:rgba(245,166,35,.04)';
+    const label=a.platform==='iptv'?(a.iptvNombre||a.iptvUser||'Cuenta IPTV'):(a.email||'—');
+    const badgeMap={vencido:'<span class="badge b-vencido">🔴 VENCIDA</span>',
+      '3d':'<span class="badge b-warning">⚠ PRÓXIMA</span>',
+      '7d':'<span class="badge b-warning">⚠ PRÓXIMA</span>'};
+    const waMsg=encodeURIComponent(`Hola ${a.supplierName||''}, te contacto por la cuenta ${p?p.name:''} (${label}) que ${st==='vencido'?'venció el':'está por vencer el'} ${fmt(a.expDate)}.`);
+    html+=`<tr style="${rowBg}">
+      <td style="color:var(--text3);font-size:11px">${i+1}</td>
+      <td><span style="display:inline-flex;align-items:center;gap:5px">${platIconHTML(a.platform,15)} ${p?p.name:'—'}</span></td>
+      <td><span style="font-family:var(--font-mono);font-size:12px">${label}</span><div style="font-size:11px;color:var(--text3)">Cuenta #${a.num||'—'}</div></td>
+      <td style="font-size:12px">${a.supplierName?`${a.supplierName}${a.supplierPhone?`<div style="font-size:11px;color:var(--text2);font-family:'DM Mono',monospace">${a.supplierPhone}</div>`:''}`:'—'}</td>
+      <td style="font-size:11px">${fmt(a.acqDate)}</td>
+      <td style="font-size:11px;font-weight:600;color:${st==='vencido'?'var(--red)':'var(--yellow)'}">${fmt(a.expDate)}</td>
+      <td>${badgeMap[st]}</td>
+      <td>
+        <div style="display:flex;gap:5px">
+          ${a.supplierPhone?`<button class="btn btn-wa btn-sm" onclick="window.open('https://api.whatsapp.com/send?phone=${a.supplierPhone}&text=${waMsg}','_blank')">📲 Proveedor</button>`:''}
+          <button class="btn btn-sm" onclick="openEditAccount('${a.id}')">✏ Editar</button>
+        </div>
+      </td>
+    </tr>`;
+  });
+  html+=`</tbody></table></div>`;
+  document.getElementById('reporte-cuentas-content').innerHTML=html;
+  return urgentAccts.length;
 }
 
 // ─────────────────────────────────────────────
