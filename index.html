@@ -157,7 +157,8 @@ main{padding:20px 24px;overflow-y:auto}
 .card-head-right{margin-left:auto;display:flex;align-items:center;gap:8px}
 
 /* TABLE */
-table{width:max-content;min-width:100%;border-collapse:collapse}
+table{width:100%;border-collapse:collapse}
+.table-compact th,.table-compact td{padding:8px 10px}
 th{font-family:var(--font-hud);font-size:11.5px;font-weight:700;color:var(--cyan);text-transform:uppercase;letter-spacing:.6px;padding:10px 14px;text-align:left;border-bottom:1px solid var(--border2);white-space:nowrap;background:rgba(255,90,31,.025);opacity:.95}
 td{padding:10px 14px;border-bottom:1px solid var(--border);font-size:13px;color:var(--text);vertical-align:middle}
 tr:last-child td{border-bottom:none}
@@ -1372,10 +1373,10 @@ function renderPlatPage(pid){
           </div>
         </div>
       </div>
-      <table>
+      <table class="table-compact">
         <thead><tr><th>#</th>
-          ${p.id==='youtube'?'<th>Correo del cliente</th><th>Contraseña</th>':'<th>Perfil</th><th>PIN</th>'}
-          <th>Cliente asignado</th><th>Celular</th><th>Vence</th><th>Estado</th>
+          ${p.id==='youtube'?'<th>Cuenta del cliente</th>':'<th>Perfil</th><th>PIN</th>'}
+          <th>Cliente asignado</th><th>Vence</th><th>Estado</th>
           ${p.id==='youtube'?'<th>Usos</th>':''}
           <th>Acción</th></tr></thead>
         <tbody>${a.profiles.map((pr,i)=>profRow(pr,a,p,i+1)).join('')}</tbody>
@@ -1396,15 +1397,18 @@ function profRow(pr,a,p,n){
     const venceStr=venceDate?fmt(venceDate):'—';
     const st=status(sub);
     const venceColor=st==='vencido'?'color:var(--red);font-weight:700':st==='1d'||st==='3d'?'color:var(--yellow);font-weight:600':'color:var(--text2)';
+    // YouTube: correo + contraseña del cliente en una sola celda (apilados) para ahorrar ancho
     const ytCols=isYT?`
-      <td style="font-size:11px;cursor:pointer" onclick="copyClick('${sub.ytEmail||''}','Correo copiado')" title="Click para copiar correo">${sub.ytEmail||'—'}</td>
-      <td><span class="pin" style="cursor:pointer" onclick="copyClick('${sub.ytPass||''}','Contraseña copiada')" title="Click para copiar contraseña">${sub.ytPass||'—'}</span></td>`
+      <td style="font-size:11px;line-height:1.6">
+        <div style="cursor:pointer;white-space:nowrap" onclick="copyClick('${sub.ytEmail||''}','Correo copiado')" title="Click para copiar correo">${sub.ytEmail||'—'}</div>
+        <span class="pin" style="cursor:pointer;display:inline-block;margin-top:2px" onclick="copyClick('${sub.ytPass||''}','Contraseña copiada')" title="Click para copiar contraseña">${sub.ytPass||'—'}</span>
+      </td>`
       :`<td><strong>${pr.name}</strong></td><td><span class="pin" style="cursor:pointer" onclick="copyClick('${pr.pin}','PIN copiado')" title="Click para copiar PIN">${pr.pin}</span></td>`;
     const estadoCell=isYT
       ? sub.ytDesactivado
-        ? `<td><button onclick="toggleYTSlot('${sub.id}')" style="background:rgba(120,120,120,.15);border:1px solid #555;color:#aaa;border-radius:6px;padding:3px 10px;font-size:11px;cursor:pointer;font-weight:700">⛔ DESACTIVADO</button></td>`
-        : `<td><button onclick="toggleYTSlot('${sub.id}')" style="background:rgba(255,0,0,.12);border:1px solid rgba(255,80,80,.3);color:#ff6b6b;border-radius:6px;padding:3px 10px;font-size:11px;cursor:pointer;font-weight:700">🔴 OCUPADO</button></td>`
-      : `<td><button onclick="unassignProf('${pr.id}')" style="background:rgba(255,0,0,.12);border:1px solid rgba(255,80,80,.3);color:#ff6b6b;border-radius:6px;padding:3px 10px;font-size:11px;cursor:pointer;font-weight:700">🔴 OCUPADO</button></td>`;
+        ? `<td><button onclick="toggleYTSlot('${sub.id}')" style="background:rgba(120,120,120,.15);border:1px solid #555;color:#aaa;border-radius:6px;padding:3px 10px;font-size:11px;cursor:pointer;font-weight:700;white-space:nowrap">⛔ DESACTIVADO</button></td>`
+        : `<td><button onclick="toggleYTSlot('${sub.id}')" style="background:rgba(255,0,0,.12);border:1px solid rgba(255,80,80,.3);color:#ff6b6b;border-radius:6px;padding:3px 10px;font-size:11px;cursor:pointer;font-weight:700;white-space:nowrap">🔴 OCUPADO</button></td>`
+      : `<td><button onclick="unassignProf('${pr.id}')" style="background:rgba(255,0,0,.12);border:1px solid rgba(255,80,80,.3);color:#ff6b6b;border-radius:6px;padding:3px 10px;font-size:11px;cursor:pointer;font-weight:700;white-space:nowrap">🔴 OCUPADO</button></td>`;
     const usoCell=isYT?`<td style="text-align:center">
       <div style="display:flex;gap:8px;align-items:center;justify-content:center">
         <label style="display:flex;align-items:center;gap:3px;font-size:11px;cursor:pointer;color:var(--text2);white-space:nowrap" title="1° vez">
@@ -1417,42 +1421,42 @@ function profRow(pr,a,p,n){
     return`<tr>
       ${num}${ytCols}
       <td>
-        <div class="ac-wrap"><input class="ac-input" style="min-width:130px" value="${cl.name}"
+        <div class="ac-wrap"><input class="ac-input" style="min-width:120px" value="${cl.name}"
           oninput="acSearch(this,'${pr.id}','${a.id}')"
           onfocus="acSearch(this,'${pr.id}','${a.id}')"
           onblur="setTimeout(()=>{ if(this.value.trim()==='') unassignProf('${pr.id}'); closeAc(this); },180)"
           placeholder="Buscar cliente...">
         <div class="ac-drop"></div></div>
+        <div style="font-family:'DM Mono',monospace;font-size:10.5px;color:var(--text3);margin-top:3px;white-space:nowrap">${cl.phone}</div>
+        ${sub.ytArchived?'<div style="color:var(--text3);font-size:10px">🔒 correo migrado</div>':''}
       </td>
-      <td style="font-family:'DM Mono',monospace;font-size:11px;color:var(--text2);white-space:nowrap">${cl.phone}${sub.ytArchived?'<div style="color:var(--text3);font-size:10px;margin-top:2px">🔒 migrado</div>':''}</td>
       <td style="font-size:11px;white-space:nowrap;${venceColor}">${venceStr}</td>
       ${estadoCell}${usoCell}
       <td>
-        <div style="display:flex;gap:5px;flex-wrap:nowrap">
-          <button class="btn btn-wa btn-sm" onclick="showWA('${sub.id}')" title="Enviar datos por WhatsApp">📲</button>
-          ${isYT&&!sub.ytArchived?`<button class="btn btn-sm" style="background:rgba(124,111,255,.15);border:1px solid rgba(124,111,255,.35);color:#a79bff" onclick="openMigrateYT('${sub.id}')" title="Migrar a un correo nuevo, conservando fechas y pago">🔁</button>`:''}
+        <div style="display:flex;flex-direction:column;gap:4px;align-items:stretch">
+          <button class="btn btn-wa btn-sm" style="justify-content:center;white-space:nowrap" onclick="showWA('${sub.id}')">📲 Enviar</button>
+          ${isYT&&!sub.ytArchived?`<button class="btn btn-sm" style="background:rgba(124,111,255,.15);border:1px solid rgba(124,111,255,.35);color:#a79bff;justify-content:center;white-space:nowrap" onclick="openMigrateYT('${sub.id}')" title="Mover a un correo nuevo, conservando fechas y pago">🔁 Migrar correo</button>`:''}
         </div>
       </td>
     </tr>`;
   }else{
     const ytColsLibre=isYT
-      ?`<td style="color:var(--text3);font-size:11px">— libre —</td><td>—</td>`
+      ?`<td style="color:var(--text3);font-size:11px">— libre —</td>`
       :`<td style="color:var(--text3)">${pr.name}</td><td><span class="pin" style="color:var(--text3);cursor:pointer" onclick="copyClick('${pr.pin}','PIN copiado')" title="Click para copiar PIN">${pr.pin}</span></td>`;
     return`<tr>
       ${num}${ytColsLibre}
       <td>
-        <div class="ac-wrap"><input class="ac-input" value=""
+        <div class="ac-wrap"><input class="ac-input" style="min-width:120px" value=""
           oninput="acSearch(this,'${pr.id}','${a.id}')"
           onfocus="acSearch(this,'${pr.id}','${a.id}')"
           onblur="setTimeout(()=>closeAc(this),180)"
           placeholder="Escribe nombre del cliente...">
         <div class="ac-drop"></div></div>
       </td>
-      <td></td>
       <td>—</td>
       <td><span class="badge b-libre">✅ LIBRE</span></td>
       ${isYT?'<td>—</td>':''}
-      <td><button class="btn-libre" onclick="waLibre('${a.id}','${pr.id}','${p.id}')">📲 LIBRE — enviar</button></td>
+      <td><button class="btn-libre" style="white-space:nowrap" onclick="waLibre('${a.id}','${pr.id}','${p.id}')">📲 LIBRE — enviar</button></td>
     </tr>`;
   }
 }
