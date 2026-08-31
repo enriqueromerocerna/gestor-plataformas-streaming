@@ -2853,6 +2853,7 @@ function renderReporteCuentas(){
           ${a.supplierPhone?`<button class="btn btn-wa btn-sm" onclick="window.open('https://api.whatsapp.com/send?phone=${a.supplierPhone}&text=${waMsg}','_blank')">📲 Proveedor</button>`:''}
           <button class="btn btn-sm" onclick="openEditAccount('${a.id}')">✏ Editar</button>
           <button class="btn btn-sm" style="background:rgba(100,200,100,.15);border:1px solid rgba(100,200,100,.3);color:#7dda8a" title="Suma 30 días desde hoy (o desde el vencimiento actual si aún no vence)" onclick="renovarCuenta('${a.id}')">🔄 Renovar</button>
+          <button class="btn btn-sm" style="background:rgba(240,86,86,.15);border:1px solid rgba(240,86,86,.3);color:#f05656" title="El cliente no renovará: la cuenta se elimina de la plataforma, pero el cliente se conserva en Clientes" onclick="noRenovarCuenta('${a.id}')">🚫 No renovar</button>
         </div>
       </td>
     </tr>`;
@@ -2877,6 +2878,30 @@ function renovarCuenta(accountId){
   saveAll();
   renderReporte();renderProveedores();renderSidebar();
   toast(`✓ Cuenta renovada hasta ${fmt(nueva)}`);
+}
+
+// El cliente ya no renovará esta cuenta: se elimina la cuenta (proveedor) de la lista de
+// cuentas de la plataforma, junto con las suscripciones/perfiles que la usaban. Los datos
+// del cliente (nombre, celular, etc.) NO se tocan y permanecen intactos en Clientes.
+function noRenovarCuenta(accountId){
+  const a=acct(accountId);if(!a)return;
+  const p=plat(a.platform);
+  const label=a.platform==='iptv'?(a.iptvNombre||a.iptvUser||'Cuenta IPTV'):(a.email||'esta cuenta');
+  const occ=(a.profiles||[]).filter(pr=>subByProfile(pr.id)).length;
+  const msg=occ>0
+    ?`🚫 Marcar "No renovar" para ${label} (${p?p.name:''}).\n\nEsta cuenta tiene ${occ} cliente${occ!==1?'s':''} asignado${occ!==1?'s':''}. Se eliminará la cuenta del proveedor y sus suscripciones, pero el/los cliente${occ!==1?'s':''} seguirán registrados en Clientes con su celular y nombre intactos.\n\n¿Confirmas?`
+    :`🚫 ¿Marcar "No renovar" y eliminar la cuenta ${label} (${p?p.name:''})?\n\nEsta acción no se puede deshacer.`;
+  if(!confirm(msg))return;
+  // Quitar suscripciones ligadas a los perfiles de esta cuenta (no se tocan los clientes)
+  const profIds=(a.profiles||[]).map(pr=>pr.id);
+  subscriptions=subscriptions.filter(s=>!profIds.includes(s.profileId));
+  // Eliminar la cuenta de la plataforma
+  accounts=accounts.filter(x=>x.id!==accountId);
+  // Renumerar las cuentas restantes de la misma plataforma
+  accounts.filter(x=>x.platform===a.platform).forEach((x,i)=>x.num=i+1);
+  saveAll();
+  renderReporte();renderProveedores();renderSidebar();renderClientes();
+  toast('🚫 Cuenta marcada como no renovada y eliminada. Cliente conservado en Clientes.');
 }
 
 // ─────────────────────────────────────────────
