@@ -1724,7 +1724,9 @@ function renderProveedores(){
         const suppPhone=a.supplierPhone||'';
         // Account expiry status
         let acctStatusHtml='';
-        if(a.expDate){
+        if(a.noRenovado){
+          acctStatusHtml=`<span class="badge b-vencido" style="font-size:10px">🚫 NO RENOVADO</span> <button class="btn btn-sm" style="padding:1px 8px;font-size:10px" onclick="reactivarCuenta('${a.id}')">↩ Reactivar</button>`;
+        }else if(a.expDate){
           const _today=new Date();_today.setHours(0,0,0,0);
           const diff=Math.round((new Date(a.expDate)-_today)/(864e5));
           const expFmt=fmt(a.expDate);
@@ -2804,7 +2806,7 @@ function renderReporteClientes(){
 // adquisición + 30 días). Devuelve el total urgente.
 function renderReporteCuentas(){
   const urgentAccts=accounts.filter(a=>{
-    const st=accountStatus(a);return st==='vencido'||st==='3d'||st==='7d';
+    if(a.noRenovado)return false;const st=accountStatus(a);return st==='vencido'||st==='3d'||st==='7d';
   }).sort((a,b)=>{const order={vencido:0,'3d':1,'7d':2};return order[accountStatus(a)]-order[accountStatus(b)];});
 
   const sinFecha=accounts.filter(a=>!a.expDate).length;
@@ -2886,6 +2888,15 @@ function renovarCuenta(accountId){
 function noRenovarCuenta(accountId){
   const a=acct(accountId);if(!a)return;
   const p=plat(a.platform);
+  // YouTube Premium: NO se elimina nada, solo se marca la cuenta como "No renovado"
+  if(a.platform==='youtube'){
+    if(!confirm(`🚫 Marcar la cuenta ${a.email||''} como "No renovado"?\n\nLa cuenta y sus usuarios se conservan, solo quedará con la etiqueta NO RENOVADO (puedes reactivarla cuando quieras).`))return;
+    a.noRenovado=true;
+    saveAll();
+    renderReporte();renderProveedores();renderSidebar();
+    toast('🚫 Cuenta marcada como NO RENOVADO. No se eliminó nada.');
+    return;
+  }
   const label=a.platform==='iptv'?(a.iptvNombre||a.iptvUser||'Cuenta IPTV'):(a.email||'esta cuenta');
   const occ=(a.profiles||[]).filter(pr=>subByProfile(pr.id)).length;
   const msg=occ>0
@@ -2902,6 +2913,14 @@ function noRenovarCuenta(accountId){
   saveAll();
   renderReporte();renderProveedores();renderSidebar();renderClientes();
   toast('🚫 Cuenta marcada como no renovada y eliminada. Cliente conservado en Clientes.');
+}
+
+function reactivarCuenta(accountId){
+  const a=acct(accountId);if(!a)return;
+  delete a.noRenovado;
+  saveAll();
+  renderReporte();renderProveedores();renderSidebar();
+  toast('↩ Cuenta reactivada');
 }
 
 // ─────────────────────────────────────────────
